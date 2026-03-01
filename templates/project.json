@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "my-app",
+    "description": "Description of your project",
+    "tech_stack": ["typescript"]
+  },
+  "agents": {
+    "tester": {
+      "test_command": "npm test"
+    },
+    "skip_conditions": {
+      "tester": ["docs-only", "config-only", "user-says-skip"],
+      "reviewer": ["docs-only", "config-only", "user-says-skip"],
+      "designer": []
+    }
+  },
+  "skills": {
+    "project_patterns": ".claude/skills/project-patterns/SKILL.md",
+    "auto_load": {
+      "ui": [],
+      "backend": []
+    },
+    "work_type_detection": {
+      "ui": {
+        "paths": ["screens/", "components/", "pages/"],
+        "extensions": [".tsx", ".jsx"]
+      },
+      "backend": {
+        "paths": ["services/", "api/", "server/", "db/"],
+        "extensions": [".ts", ".js", ".sql"]
+      },
+      "domain": { "paths": ["domain/", "lib/", "utils/", "core/"] }
+    }
+  },
+  "constraints": [
+    "Example: Screens < 400 lines",
+    "Example: Use project-specific icon library only"
+  ],
+  "integrations": {}
+}

@@ -1,0 +1,5 @@
+{
+  "name": "dev-workflow",
+  "description": "Generic agent orchestration plugin for Claude Code — router, builder, tester, reviewer, planner with config-driven workflows",
+  "version": "1.0.0"
+}
