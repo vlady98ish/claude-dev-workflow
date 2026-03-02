@@ -53,7 +53,7 @@ If .claude/project.json does NOT exist:
 **Validate required fields:**
 ```
 REQUIRED: version, project.name, project.tech_stack, agents.tester.test_command
-OPTIONAL: agents.skip_conditions, agents.retry_limits, skills.*, constraints, integrations, features.decision_log, features.flow_diagrams, features.kanban
+OPTIONAL: agents.skip_conditions, agents.retry_limits, skills.*, constraints, integrations, mcp.codex, mcp.octocode, features.decision_log, features.flow_diagrams, features.kanban
 ```
 
 If missing field → use default. If file missing after bootstrap → use full defaults:
@@ -81,6 +81,10 @@ If missing field → use default. If file missing after bootstrap → use full d
   },
   "constraints": [],
   "integrations": {},
+  "mcp": {
+    "codex": { "enabled": true, "required": false },
+    "octocode": { "enabled": true, "required": false }
+  },
   "features": {
     "decision_log": { "enabled": true, "path": "docs/decisions/DECISIONS.md" },
     "flow_diagrams": { "enabled": true, "format": "mermaid" },
@@ -173,7 +177,7 @@ for agent_name, conditions in config.agents.skip_conditions:
 | DEBUG | debugger → builder → [tester] → [reviewer] → memory-update |
 | MIGRATE | migrator → [builder] → [tester] → [reviewer] → memory-update |
 | REVIEW | reviewer → memory-update |
-| PLAN | planner → codex-validate → memory-update |
+| PLAN | planner → [octocode-research] → [codex-validate] → memory-update |
 
 `[agent]` = skippable via skip_conditions. Designer uses backend waterfall (Cursor → Gemini → skill-only).
 
@@ -372,7 +376,15 @@ TaskCreate({ subject: "{name} Memory Update", activeForm: "Persisting" })
 ```
 TaskCreate({ subject: "{name} PLAN: {feature}", activeForm: "Planning" })
 TaskCreate({ subject: "{name} planner: Create plan", activeForm: "Creating plan" })
-TaskCreate({ subject: "{name} codex-validate: Review plan", activeForm: "Validating" })
+
+if octocode_available:
+  TaskCreate({ subject: "{name} octocode: Deep research", activeForm: "Researching" })
+  # blocked_by planner
+
+if codex_available:
+  TaskCreate({ subject: "{name} codex-validate: Review plan", activeForm: "Validating" })
+  # blocked_by octocode (if present) or planner
+
 TaskCreate({ subject: "{name} Memory Update: Index plan", activeForm: "Indexing" })
 ```
 
@@ -432,15 +444,36 @@ Execute the task. End with your JSON contract block.
 )
 ```
 
-## Codex Validation (PLAN only)
+## Deep Research with OctoCode (PLAN only, optional)
+
+Before Codex validation, if OctoCode MCP is available, use it for deep codebase research:
+
+```
+# 1. Check if OctoCode is available
+ToolSearch(query="octocode")
+
+# 2. If available → use for plan validation research:
+#    - Search for existing patterns the plan should follow
+#    - Verify file paths and structure referenced in plan
+#    - Find related code that may be affected by planned changes
+#    - Check external package APIs referenced in plan
+#
+# 3. If NOT available → skip (research is optional, not blocking)
+```
+
+OctoCode tools: `githubSearchCode`, `githubGetFileContent`, `githubViewRepoStructure`, `githubSearchPullRequests`, `packageSearch`
+
+Use these to enrich the planner's context — especially for unfamiliar codebases or external dependencies.
+
+## Codex Validation (PLAN only, optional)
 
 1. Extract `plan_path` from planner contract
 2. Read plan content
-3. **Load the deferred Codex tool** (REQUIRED before first call):
+3. **Check if Codex MCP is available:**
 ```
 ToolSearch(query="select:mcp__codex-subagent__spawn_agent")
 ```
-4. Spawn Codex:
+4. **If Codex available** → spawn validation:
 ```
 mcp__codex-subagent__spawn_agent({
   prompt: "Review this plan for a {tech_stack} project.
@@ -454,6 +487,12 @@ mcp__codex-subagent__spawn_agent({
 5. If APPROVED → memory-update
 6. If ISSUES_FOUND → re-invoke planner with `CODEX_FEEDBACK:` (max 3 iterations)
 7. After 3 failures → warn and proceed
+
+**If Codex NOT available:**
+- Log warning: "Codex MCP not installed — skipping plan validation"
+- Suggest: "Install codex-subagent MCP for automatic plan review"
+- Proceed directly to memory-update (plan is still saved, just unvalidated)
+- Set `codex_iterations: -1` in run log to indicate skipped
 
 ## Run Observability
 

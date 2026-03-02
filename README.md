@@ -125,7 +125,7 @@ Every request goes through the router, which reads your config, detects intent, 
 | **BUILD** | [Designer] → Builder → Tester → Reviewer | Default for any task |
 | **BUILD (UI)** | Designer → Builder → Tester → Reviewer | UI-related files detected |
 | **DEBUG** | Debugger → Builder → Tester → Reviewer | "fix", "bug", "error", "broken" |
-| **PLAN** | Planner → Codex Validate | "plan", "design", "architect" |
+| **PLAN** | Planner → [OctoCode Research] → [Codex Validate] | "plan", "design", "architect" |
 | **HOTFIX** | Debugger → Builder → Tester (targeted) | `/ship-hotfix` |
 | **MIGRATE** | Migrator → [Builder] → Tester → Reviewer | "migrate", "schema", "migration" |
 | **REVIEW** | Reviewer | "review", "audit", "check" |
@@ -176,6 +176,10 @@ All config lives in `.claude/project.json`:
     "auto_load": { "ui": ["ui-ux-pro-max"], "backend": [] }
   },
   "constraints": ["Components < 300 lines"],
+  "mcp": {
+    "codex": { "enabled": true, "required": false },
+    "octocode": { "enabled": true, "required": false }
+  },
   "features": {
     "decision_log": { "enabled": true, "path": "docs/decisions/DECISIONS.md" },
     "flow_diagrams": { "enabled": true, "format": "mermaid" },
@@ -195,6 +199,21 @@ All config lives in `.claude/project.json`:
 | `features.decision_log` | Append-only log of architectural decisions |
 | `features.flow_diagrams` | Auto-generate Mermaid flow diagrams during planning |
 | `features.kanban` | Task board synced from progress (`sync`: none / github / linear / clickup) |
+| `mcp.codex` | Plan validation via Codex subagent (auto-skipped if not installed) |
+| `mcp.octocode` | Deep code search & research during planning (auto-skipped if not installed) |
+
+## MCP Servers (Optional)
+
+The plugin works without any MCP servers, but these supercharge specific workflows:
+
+| MCP | What It Does | Used By |
+|-----|-------------|---------|
+| **OctoCode** | Deep code search — GitHub repos, package APIs, PR history. Better than context7 for code forensics | Planner (research phase) |
+| **Codex** | Spawns a subagent to validate plans against your codebase | Router (plan validation) |
+| **Gemini** | UI component generation | Designer agent |
+| **ClickUp** | Kanban board sync | Router (if kanban.sync = "clickup") |
+
+All are **gracefully optional** — if not installed, the workflow skips that step and continues. The `/ship-doctor` command shows which MCPs are connected.
 
 ## Skills & Marketplace
 

@@ -57,17 +57,25 @@ Grep(pattern="## Tasks", path=".claude/memory/progress.md")
 **Fix suggestions:** Create missing files from templates. Compact large files.
 
 ### 3) MCP Connections
-```
-# Check Gemini MCP (for designer agent)
-# Check Codex MCP (for plan validation)
-# Check ClickUp MCP (if integration enabled)
-```
 
-For each configured integration:
-- [ ] MCP server is listed in available tools
-- [ ] Basic connectivity works
+Check each MCP based on `config.mcp` settings:
 
-**Fix suggestions:** Install missing MCP servers, check auth tokens.
+| MCP | Tool Probe | Used By | Required? |
+|-----|-----------|---------|-----------|
+| Codex | `ToolSearch(query="codex")` | Plan validation | No (skips if missing) |
+| OctoCode | `ToolSearch(query="octocode")` | Deep research in planning | No (skips if missing) |
+| Gemini | Check designer backend config | Designer agent | No (falls back to skill-only) |
+| ClickUp | `ToolSearch(query="clickup")` | Kanban sync (if configured) | No |
+
+For each:
+- [ ] MCP server responds to ToolSearch
+- [ ] If `config.mcp.{name}.enabled` but not found → warn with install instructions
+- [ ] If `config.mcp.{name}.required` and not found → error
+
+**Fix suggestions:**
+- Missing Codex → "Add codex-subagent MCP server to your Claude Code settings"
+- Missing OctoCode → "Add octocode MCP server — enables deep code search during planning"
+- Missing Gemini → "Designer will use skill-only mode (no MCP generation)"
 
 ### 4) Agent Availability
 
@@ -146,9 +154,10 @@ If `features.kanban.enabled`:
 - Sizes OK (activeContext: 12KB, patterns: 8KB, progress: 10KB)
 
 ### MCP Connections
-- Gemini: ✓ available
-- Codex: ✓ available
-- ClickUp: ✗ NOT CONFIGURED (optional)
+- Codex: ✓ available (plan validation)
+- OctoCode: ✓ available (deep research)
+- Gemini: ✓ available (designer)
+- ClickUp: ✗ not configured (optional, for kanban sync)
 
 ### Agents ✓
 - 7/7 agents present

@@ -57,6 +57,16 @@ Activate when:
 - Understand existing architecture
 - Review tech stack from Router context
 
+### 2.5) Deep Research with OctoCode (if available)
+
+If OctoCode MCP tools are available (router will indicate in prompt), use them for deeper research:
+- `githubSearchCode` — find patterns in external repos for reference implementations
+- `githubViewRepoStructure` — understand structure of dependencies
+- `packageSearch` — verify external packages exist and check their APIs
+- `githubSearchPullRequests` — find how similar features were implemented elsewhere
+
+This is optional — if OctoCode is not available, rely on local Grep/Glob/Read.
+
 ### 3) Understand Patterns
 - Review existing code patterns in the codebase
 - Check constraints from Router prompt injection
