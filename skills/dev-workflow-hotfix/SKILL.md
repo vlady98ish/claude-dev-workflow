@@ -108,6 +108,21 @@ After fix is verified, generate postmortem stub:
 
 Save to `docs/postmortems/YYYY-MM-DD-{issue-slug}.md`
 
+### 5.5) Decision Log Entry (if features.decision_log.enabled)
+
+Append hotfix rationale to `docs/decisions/DECISIONS.md`:
+- Same Write-or-Edit pattern as planner
+- Entry format:
+```
+### [YYYY-MM-DD] HOTFIX: {fix strategy}
+**Context:** {incident description}
+**Decision:** {fix approach}
+**Alternatives:** {what else was considered}
+**Ref:** [postmortem](docs/postmortems/YYYY-MM-DD-{issue-slug}.md)
+```
+
+Read each file first, then make targeted Edits.
+
 ### 6) Update Memory
 - Add to `patterns.md ## Common Gotchas`
 - Update `activeContext.md` with postmortem reference

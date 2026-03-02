@@ -93,7 +93,40 @@ Verify referenced skills exist:
 # Check each auto_load skill path
 ```
 
-### 6) Stale State Detection
+### 6) Features Validation
+
+```
+Read(file_path=".claude/project.json")  # already loaded from step 1
+```
+
+If `features` key exists, validate:
+- [ ] `features.decision_log.enabled` is boolean
+- [ ] `features.decision_log.path` is string (if enabled)
+- [ ] `features.flow_diagrams.enabled` is boolean
+- [ ] `features.flow_diagrams.format` is "mermaid" (only supported format)
+- [ ] `features.kanban.enabled` is boolean
+- [ ] `features.kanban.path` is string (if enabled)
+- [ ] `features.kanban.sync` is one of: "none", "github", "linear", "clickup"
+
+If `features` key missing → OK (defaults applied by router).
+
+If `features.decision_log.enabled`:
+- [ ] `docs/decisions/DECISIONS.md` exists
+- [ ] File contains `## Log` anchor
+  ```
+  Grep(pattern="## Log", path="docs/decisions/DECISIONS.md")
+  ```
+
+If `features.kanban.enabled`:
+- [ ] `docs/kanban/BOARD.md` exists
+- [ ] File `## Last Updated` timestamp is < 24h old (warn if stale)
+
+**Fix suggestions:**
+- Missing DECISIONS.md → "Run /dev-workflow-init or create from template"
+- Missing `## Log` anchor → "Add `## Log` section to DECISIONS.md"
+- Stale kanban → "Next workflow run will refresh it"
+
+### 7) Stale State Detection
 - Any tasks stuck in `in_progress` for > 24 hours?
 - Any `runs.jsonl` entries showing repeated failures?
 - Any memory files with `## Last Updated` > 7 days old?
@@ -124,6 +157,11 @@ Verify referenced skills exist:
 - project-patterns: ✓ found
 - ui-ux-pro-max: ✓ found
 - supabase-postgres: ✓ found
+
+### Features
+- Decision Log: ✓ enabled (docs/decisions/DECISIONS.md exists, ## Log anchor present)
+- Flow Diagrams: ✓ enabled (mermaid format)
+- Kanban: ✗ disabled
 
 ### Warnings
 - ⚠ patterns.md is 45KB — consider compaction

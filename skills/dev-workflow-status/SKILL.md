@@ -68,10 +68,50 @@ Show:
 - Integrations enabled
 - Test command
 
-### 5) Health Check (quick)
+### 5) Decision Log (if enabled + file exists)
+
+```
+Read(file_path=".claude/project.json")  # check features.decision_log.enabled
+if decision_log_enabled and exists("docs/decisions/DECISIONS.md"):
+  Read(file_path="docs/decisions/DECISIONS.md")
+  # Show last 5 entries from ## Log
+```
+
+Display as:
+```
+## Recent Decisions
+
+| Date | Decision | Ref |
+|------|----------|-----|
+| 2026-03-01 | Use Redis for caching | [plan](docs/plans/...) |
+| 2026-02-28 | HOTFIX: Fix auth race condition | [postmortem](docs/postmortems/...) |
+```
+
+### 6) Kanban Summary (if enabled + file exists)
+
+```
+if kanban_enabled and exists("docs/kanban/BOARD.md"):
+  Read(file_path="docs/kanban/BOARD.md")
+  # Show In Progress + Blocked counts
+```
+
+Display as:
+```
+## Kanban
+
+| Column | Count |
+|--------|-------|
+| In Progress | 3 |
+| Blocked | 1 |
+| Review | 2 |
+```
+
+### 7) Health Check (quick)
 - Memory files exist? ✓/✗
 - Config valid? ✓/✗
 - Any stale tasks (in_progress > 24h)? ✓/✗
+- Decision log accessible? ✓/✗/N/A
+- Kanban fresh (< 24h)? ✓/✗/N/A
 
 ## Resume Workflow
 

@@ -53,7 +53,7 @@ If .claude/project.json does NOT exist:
 **Validate required fields:**
 ```
 REQUIRED: version, project.name, project.tech_stack, agents.tester.test_command
-OPTIONAL: agents.skip_conditions, agents.retry_limits, skills.*, constraints, integrations
+OPTIONAL: agents.skip_conditions, agents.retry_limits, skills.*, constraints, integrations, features.decision_log, features.flow_diagrams, features.kanban
 ```
 
 If missing field → use default. If file missing after bootstrap → use full defaults:
@@ -80,7 +80,12 @@ If missing field → use default. If file missing after bootstrap → use full d
     }
   },
   "constraints": [],
-  "integrations": {}
+  "integrations": {},
+  "features": {
+    "decision_log": { "enabled": true, "path": "docs/decisions/DECISIONS.md" },
+    "flow_diagrams": { "enabled": true, "format": "mermaid" },
+    "kanban": { "enabled": false, "path": "docs/kanban/BOARD.md", "sync": "none" }
+  }
 }
 ```
 
@@ -185,6 +190,9 @@ for agent_name, conditions in config.agents.skip_conditions:
 | reviewer | `REVIEW_REPORT` | final_status, issues |
 | planner | `PLAN_COMPLETE` | plan_path, confidence, acceptance |
 | migrator | `MIGRATION_PLAN` | up, down, rollback_plan, risk |
+
+**Optional contract fields:**
+- `PLAN_COMPLETE`: `flow_path`, `decisions_added` (present when features enabled)
 
 **Validation rules:**
 1. Parse JSON block from agent output (search for ```json ... ``` at end)
@@ -413,6 +421,11 @@ Agent(
 ## Skills Loaded
 {skills list}
 
+## Features
+- decision_log: {enabled/disabled, from config.features.decision_log.enabled}
+- flow_diagrams: {enabled/disabled, from config.features.flow_diagrams.enabled}
+- kanban: {enabled/disabled, from config.features.kanban.enabled}
+
 ---
 Execute the task. End with your JSON contract block.
 "
@@ -466,9 +479,57 @@ Entry format:
   "issues_found": {"critical": 0, "high": 0, "medium": 1, "low": 0},
   "codex_iterations": 0,
   "remediations": 0,
-  "retries": { "tester_fail": 0, "reviewer_changes": 0 }
+  "retries": { "tester_fail": 0, "reviewer_changes": 0 },
+  "features_used": ["decision_log", "flow_diagrams"]
 }
 ```
+
+## Kanban Sync (if enabled)
+
+After memory update, if `config.features.kanban.enabled`:
+
+```
+# Read progress to derive board state
+Read(file_path=".claude/memory/progress.md")
+
+# Parse ## Tasks → classify into columns:
+#   - Unchecked items (- [ ]) → In Progress (if current workflow) or Backlog
+#   - Checked items (- [x]) from ## Completed → Done (recent)
+#   - Items with "blocked" mention → Blocked
+#   - Items with "review" mention → Review
+
+Bash(command="mkdir -p docs/kanban")
+Write(file_path="docs/kanban/BOARD.md", content="
+# Kanban Board
+
+> Auto-generated from `.claude/memory/progress.md`. Do NOT edit manually.
+> **Last synced:** {timestamp}
+
+## Backlog
+{unchecked tasks not in current workflow}
+
+## In Progress
+{unchecked tasks in current workflow}
+
+## Review
+{tasks with review mention}
+
+## Blocked
+{tasks with blocked mention}
+
+## Done (recent)
+{last 20 checked items from ## Completed}
+
+## Last Updated
+{timestamp}
+")
+```
+
+If `config.features.kanban.sync` is set:
+- `"github"` → sync to GitHub Projects using `gh` CLI
+- `"linear"` → sync to Linear using Linear MCP (if available)
+- `"clickup"` → sync to ClickUp using ClickUp MCP (if available)
+- `"none"` → markdown only (default)
 
 ## Integration Sync (Config-Driven)
 

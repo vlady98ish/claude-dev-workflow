@@ -47,5 +47,10 @@
     "Example: Screens < 400 lines",
     "Example: Use project-specific icon library only"
   ],
-  "integrations": {}
+  "integrations": {},
+  "features": {
+    "decision_log": { "enabled": true, "path": "docs/decisions/DECISIONS.md" },
+    "flow_diagrams": { "enabled": true, "format": "mermaid" },
+    "kanban": { "enabled": false, "path": "docs/kanban/BOARD.md", "sync": "none" }
+  }
 }

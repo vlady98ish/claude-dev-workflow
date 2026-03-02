@@ -120,6 +120,44 @@ AskUserQuestion:
   → default from catalog.stack_presets[stack].default_config.test_command
 ```
 
+## Step 5.5: Tracking Preset
+
+```
+AskUserQuestion:
+  question: "How much project tracking do you want?"
+  header: "Tracking"
+  options:
+    - label: "Solo (Recommended)"
+      description: "Decision history + flow diagrams in plans. No task board."
+    - label: "Team"
+      description: "Everything above + shared Kanban board synced from progress."
+    - label: "Custom"
+      description: "Choose each feature manually."
+```
+
+**If Solo** → `decision_log: true`, `flow_diagrams: true`, `kanban: false`, `kanban_sync: "none"`
+
+**If Team** → `decision_log: true`, `flow_diagrams: true`, `kanban: true`, then ask:
+```
+AskUserQuestion:
+  question: "Sync Kanban board with an external tool?"
+  header: "Sync"
+  options:
+    - label: "No sync (Recommended)"
+      description: "Markdown board only, updated after each workflow."
+    - label: "GitHub Projects"
+      description: "Auto-sync cards to GitHub Projects board."
+    - label: "Linear"
+      description: "Auto-sync cards to Linear workspace."
+    - label: "ClickUp"
+      description: "Auto-sync cards to ClickUp workspace."
+```
+
+**If Custom** → ask 3 individual yes/no questions:
+1. `"Keep a running log of technical decisions and why they were made?"` → decision_log
+2. `"Auto-generate flow diagrams (Mermaid) when planning complex features?"` → flow_diagrams
+3. `"Create a Kanban board (Todo/Doing/Done) from your task plans?"` → kanban (+ sync follow-up if yes)
+
 ## Step 6: Select Skills
 
 Based on detected stacks, show recommended + optional skills from catalog:
@@ -213,7 +251,12 @@ config = {
     "work_type_detection": merge_work_type_detection(detected_stacks, catalog)
   },
   "constraints": [],
-  "integrations": {}
+  "integrations": {},
+  "features": {
+    "decision_log": { "enabled": decision_log_enabled, "path": "docs/decisions/DECISIONS.md" },
+    "flow_diagrams": { "enabled": flow_diagrams_enabled, "format": "mermaid" },
+    "kanban": { "enabled": kanban_enabled, "path": "docs/kanban/BOARD.md", "sync": kanban_sync }
+  }
 }
 ```
 
@@ -232,6 +275,18 @@ if not exists(".claude/skills/project-patterns/SKILL.md"):
   Bash(command="mkdir -p .claude/skills/project-patterns")
   PLUGIN_DIR = find_plugin_dir()
   Bash(command="cp {PLUGIN_DIR}/templates/project-patterns/SKILL.md .claude/skills/project-patterns/SKILL.md")
+```
+
+### Create Feature Files (if enabled)
+
+```
+if decision_log_enabled:
+  Bash(command="mkdir -p docs/decisions")
+  Write(file_path="docs/decisions/DECISIONS.md", content=decisions_template_from_memory_skill)
+
+if kanban_enabled:
+  Bash(command="mkdir -p docs/kanban")
+  Write(file_path="docs/kanban/BOARD.md", content=kanban_template_from_memory_skill)
 ```
 
 ### Generate CLAUDE.md and AGENTS.md
@@ -297,6 +352,13 @@ Write(file_path="CLAUDE.md", content=rendered_claude_md)
 - `.claude/project.json` — project config
 - `.claude/skills/project-patterns/SKILL.md` — add your conventions here
 - `.claude/memory/` — memory directory (auto-populated on first run)
+
+### Enabled Features
+| Feature | Status | Path |
+|---------|--------|------|
+| Decision Log | {ON/OFF} | docs/decisions/DECISIONS.md |
+| Flow Diagrams | {ON/OFF} | docs/flows/ (auto-created during planning) |
+| Kanban Board | {ON/OFF} | docs/kanban/BOARD.md |
 
 ### Next Steps
 1. Edit `.claude/skills/project-patterns/SKILL.md` with your project conventions

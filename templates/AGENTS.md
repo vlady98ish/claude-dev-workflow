@@ -36,6 +36,13 @@ If `.claude/project.json` is missing → router triggers `/dev-workflow-init` au
 │   └── activeContext.md   # Current context
 └── skills/               # Installed skills
     └── project-patterns/  # Project-specific conventions
+docs/
+├── plans/                # Feature plans (auto-generated)
+├── decisions/            # Decision log + ADRs
+│   └── DECISIONS.md      # Why we chose X over Y
+├── flows/                # Mermaid flow diagrams
+└── kanban/               # Task board (if enabled)
+    └── BOARD.md          # Auto-synced from progress
 ```
 
 ## Key Files
@@ -43,6 +50,17 @@ If `.claude/project.json` is missing → router triggers `/dev-workflow-init` au
 - **Config:** `.claude/project.json` — project rules, constraints, agent settings
 - **Memory:** `.claude/memory/activeContext.md` — read on session start
 - **Patterns:** `.claude/skills/project-patterns/SKILL.md` — project conventions
+
+## Workflow Features
+
+| Feature | What It Does | Updated When |
+|---------|-------------|-------------|
+| Decision Log | Records "why we chose X" for technical decisions | During planning, hotfixes |
+| Flow Diagrams | Mermaid diagrams of user journeys & data flows | During planning |
+| Kanban Board | Visual task board (Backlog → Done) | After each workflow run |
+
+- Config: `.claude/project.json` → `features` section
+- To disable: set `"enabled": false` in config
 
 ## Workflow
 

@@ -96,6 +96,10 @@ As a [user type], I want [goal] so that [benefit].
 | Risk | Mitigation |
 |------|------------|
 
+### Key Decisions
+| Decision | Choice | Why | Alternatives Rejected |
+|----------|--------|-----|----------------------|
+
 ### Open Questions (if any)
 - Question needing user input
 ```
@@ -174,25 +178,62 @@ Then use AskUserQuestion tool. Do NOT handoff until answered.
 
 ## Decision Documentation
 
-Major decisions → update `.claude/memory/activeContext.md` Decisions section using Edit tool.
+When making architectural decisions during planning:
 
-## Two-Step Save (CRITICAL)
+1. Update `.claude/memory/activeContext.md` → `## Decisions` (existing, for session context)
+2. If features.decision_log.enabled → ALSO append to `docs/decisions/DECISIONS.md`:
+   - Check if file exists → Write template if not, Edit if exists
+   - Append entry after `## Log` anchor:
+     `### [YYYY-MM-DD] {Decision Title}`
+     `**Context:** {why this came up}`
+     `**Decision:** {what we chose}`
+     `**Alternatives:** {what we rejected and why}`
+     `**Ref:** [plan](docs/plans/YYYY-MM-DD-feature.md)`
+
+## Multi-Step Save (CRITICAL)
 
 ```
-# 1. Save plan file
+# Step 1: Save plan file
 Bash(command="mkdir -p docs/plans")
 Write(file_path="docs/plans/YYYY-MM-DD-<feature>-plan.md", content="...")
 
-# 2. Update memory using stable anchors
-Read(file_path=".claude/memory/activeContext.md")
+# Step 2: Save flow diagram (if features.flow_diagrams.enabled)
+if flow_diagrams_enabled:
+  Bash(command="mkdir -p docs/flows")
+  Write(file_path="docs/flows/YYYY-MM-DD-<feature>.md", content="
+    # Flow: {Feature Name}
+    **Plan:** docs/plans/YYYY-MM-DD-<feature>-plan.md
+    ## Main Flow
+    ```mermaid
+    flowchart TD
+      A[Start] --> B{Decision}
+      B -->|Yes| C[Action]
+      B -->|No| D[Alternative]
+    ```
+    ## Error Paths
+    ```mermaid
+    flowchart TD
+      A[Action] -->|Error| E[Handle Error]
+    ```
+  ")
 
-# Add plan to References
+# Step 3: Append decisions to log (if features.decision_log.enabled)
+if decision_log_enabled:
+  if not exists("docs/decisions/DECISIONS.md"):
+    Bash(command="mkdir -p docs/decisions")
+    Write(file_path="docs/decisions/DECISIONS.md", content=template)
+  Read(file_path="docs/decisions/DECISIONS.md")
+  Edit(file_path="docs/decisions/DECISIONS.md",
+       old_string="## Log",
+       new_string="## Log\n\n### [YYYY-MM-DD] {Decision}\n**Context:** ...\n**Decision:** ...\n**Alternatives:** ...\n**Ref:** [plan](...)")
+  Read(file_path="docs/decisions/DECISIONS.md")  # VERIFY
+
+# Step 4: Update memory using stable anchors
+Read(file_path=".claude/memory/activeContext.md")
 Edit(file_path=".claude/memory/activeContext.md",
      old_string="## References",
-     new_string="## References\n- Plan: `docs/plans/YYYY-MM-DD-<feature>-plan.md`")
-
-# VERIFY (do not skip)
-Read(file_path=".claude/memory/activeContext.md")
+     new_string="## References\n- Plan: `{plan_path}`\n- Flow: `{flow_path}`")
+Read(file_path=".claude/memory/activeContext.md")  # VERIFY
 ```
 
 ## Codex Revision Mode
@@ -224,6 +265,8 @@ This allows the router to find the plan file and pass it to Codex for validation
   "artifact": "PLAN_COMPLETE",
   "handoff": "BUILDER",
   "plan_path": "docs/plans/YYYY-MM-DD-feature-plan.md",
+  "flow_path": "docs/flows/YYYY-MM-DD-feature.md",
+  "decisions_added": ["Decision title 1"],
   "start_task": {
     "taskId": "<real_task_id>",
     "summary": "What to do first"

@@ -1,319 +1,165 @@
-# dev-workflow
-
-Generic agent orchestration plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Structured workflows with 7 specialized agents, config-driven everything, run observability, and DX commands.
-
-> **One config file. Any project. Full quality pipeline.**
+<p align="center">
+  <h1 align="center">dev-workflow</h1>
+  <p align="center">
+    Agent orchestration plugin for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>
+    <br />
+    <em>7 agents &middot; 11 skills &middot; config-driven &middot; memory across sessions</em>
+  </p>
+  <p align="center">
+    <a href="#quick-start">Quick Start</a> &middot;
+    <a href="#commands">Commands</a> &middot;
+    <a href="#how-it-works">How It Works</a> &middot;
+    <a href="#configuration">Configuration</a>
+  </p>
+</p>
 
 ---
 
-## Architecture Overview
+**dev-workflow** turns Claude Code into a structured development pipeline. Instead of one-shot prompts, every task flows through specialized agents — a debugger that diagnoses before fixing, a tester that verifies before reviewing, a reviewer that gates before merging.
 
-```mermaid
-graph TB
-    User([User Request]) --> Router
+One config file. Any project. Full quality pipeline.
 
-    subgraph Router["Router (Entry Point)"]
-        Config[Load project.json] --> Intent[Detect Intent]
-        Intent --> Memory[Load Memory]
-        Memory --> Skills[Load Skills]
-        Skills --> Skip[Evaluate Skip Conditions]
-    end
+## Quick Start
 
-    Skip --> |ERROR| DEBUG
-    Skip --> |MIGRATE| MIGRATE
-    Skip --> |PLAN| PLAN
-    Skip --> |REVIEW| REVIEW
-    Skip --> |DEFAULT| BUILD
+### Install
 
-    subgraph BUILD["BUILD Workflow"]
-        direction LR
-        B_Des[Designer] -.->|UI only| B_Bld[Builder]
-        B_Bld --> B_Tst[Tester]
-        B_Tst --> B_Rev[Reviewer]
-    end
-
-    subgraph DEBUG["DEBUG Workflow"]
-        direction LR
-        D_Dbg[Debugger] --> D_Bld[Builder]
-        D_Bld --> D_Tst[Tester]
-        D_Tst --> D_Rev[Reviewer]
-    end
-
-    subgraph MIGRATE["MIGRATE Workflow"]
-        direction LR
-        M_Mig[Migrator] -.->|if app changes| M_Bld[Builder]
-        M_Bld --> M_Tst[Tester]
-        M_Tst --> M_Rev[Reviewer]
-    end
-
-    subgraph PLAN["PLAN Workflow"]
-        direction LR
-        P_Plan[Planner] --> P_Codex[Codex Validate]
-        P_Codex -.->|issues found| P_Plan
-    end
-
-    subgraph REVIEW["REVIEW Workflow"]
-        R_Rev[Reviewer]
-    end
-
-    BUILD --> MemUpdate[Memory Update]
-    DEBUG --> MemUpdate
-    MIGRATE --> MemUpdate
-    PLAN --> MemUpdate
-    REVIEW --> MemUpdate
-    MemUpdate --> RunLog[Log to runs.jsonl]
-    RunLog --> IntSync[Integration Sync]
-
-    style Router fill:#4a90d9,color:#fff
-    style MemUpdate fill:#27ae60,color:#fff
-    style RunLog fill:#8e44ad,color:#fff
+```
+/plugin marketplace add vlady98ish/claude-dev-workflow
+/plugin install dev-workflow@dev-workflow
 ```
 
-## Agent Contract Flow
+### Use
 
-Every agent produces a structured JSON contract. The router validates it before unblocking the next agent.
+Just start working — the router auto-detects your intent and runs the right workflow:
 
-```mermaid
-sequenceDiagram
-    participant R as Router
-    participant A as Agent
-    participant V as Validator
-
-    R->>A: Invoke with task + context + constraints
-    A->>A: Execute task
-    A->>R: Return output with JSON contract
-    R->>V: Validate contract (required fields?)
-    alt Valid
-        V->>R: PASS
-        R->>R: Unblock next agent
-    else Invalid
-        V->>R: FAIL (missing fields)
-        R->>R: Create REMEDIATION task
-        R->>A: Re-invoke with missing field list
-    end
+```
+> build a login page          → BUILD:  Designer → Builder → Tester → Reviewer
+> fix the auth crash          → DEBUG:  Debugger → Builder → Tester → Reviewer
+> plan the payments feature   → PLAN:   Planner → Codex Validate
+> review the auth module      → REVIEW: Reviewer
 ```
 
-## Agents
+On first run, the plugin bootstraps your project: detects tech stack, installs recommended skills from [skills.sh](https://skills.sh/), and generates config.
 
-```mermaid
-graph LR
-    subgraph "Read-Only (Diagnosis)"
-        Debugger["Debugger\n(opus, red)"]
-        Reviewer["Reviewer\n(opus, blue)"]
-    end
+## What You Get
 
-    subgraph "Read-Write (Implementation)"
-        Designer["Designer\n(sonnet, pink)"]
-        Builder["Builder\n(sonnet, green)"]
-        Tester["Tester\n(sonnet, yellow)"]
-        Migrator["Migrator\n(opus, orange)"]
-    end
+**Agents** — 7 specialized roles, each with a strict contract:
 
-    subgraph "Planning"
-        Planner["Planner\n(opus, cyan)"]
-    end
+| Agent | Does | Produces |
+|-------|------|----------|
+| Debugger | Root cause analysis before any fix attempt | `DIAGNOSIS` |
+| Designer | UI generation via Cursor Agent / Gemini MCP | `DESIGNER_COMPLETE` |
+| Builder | Implementation with TDD evidence | `BUILDER_COMPLETE` |
+| Tester | Runs tests, maps results to acceptance criteria | `TEST_REPORT` |
+| Reviewer | Security + pattern validation (read-only) | `REVIEW_REPORT` |
+| Planner | Specs, task breakdown, flow diagrams | `PLAN_COMPLETE` |
+| Migrator | DB migrations with rollback plans | `MIGRATION_PLAN` |
 
-    Debugger -->|DIAGNOSIS| Builder
-    Designer -->|GENERATED_CODE| Builder
-    Builder -->|BUILDER_COMPLETE| Tester
-    Tester -->|TEST_REPORT| Reviewer
-    Reviewer -->|REVIEW_REPORT| Router([Router])
-    Planner -->|PLAN_COMPLETE| Codex([Codex])
-    Migrator -->|MIGRATION_PLAN| Builder
+**Memory** — context that survives between sessions:
 
-    style Debugger fill:#e74c3c,color:#fff
-    style Designer fill:#e91e8e,color:#fff
-    style Builder fill:#27ae60,color:#fff
-    style Tester fill:#f1c40f,color:#000
-    style Reviewer fill:#3498db,color:#fff
-    style Planner fill:#1abc9c,color:#fff
-    style Migrator fill:#e67e22,color:#fff
+| File | Tracks |
+|------|--------|
+| `activeContext.md` | Current focus, decisions, learnings |
+| `patterns.md` | Architecture conventions, gotchas |
+| `progress.md` | Tasks, completed work, test evidence |
+| `runs.jsonl` | Every workflow execution (append-only) |
+
+**Features** — optional tracking tools:
+
+| Feature | What It Does | Default |
+|---------|-------------|---------|
+| Decision Log | Records *why* you chose X over Y — survives compaction | ON |
+| Flow Diagrams | Mermaid diagrams of data flows, generated during planning | ON |
+| Kanban Board | Visual task board synced from progress (supports ClickUp, GitHub, Linear) | OFF |
+
+## Commands
+
+| Command | When |
+|---------|------|
+| `/dev-workflow-router` | Any dev task (auto-triggered) |
+| `/dev-workflow-init` | Bootstrap project or search for skills |
+| `/dev-workflow-plan` | Plan + Codex validation before building |
+| `/dev-workflow-design` | Iterate on UI before building |
+| `/dev-workflow-hotfix` | Production incident fast-path |
+| `/dev-workflow-sprint` | Parallel build with agent teams + worktrees |
+| `/dev-workflow-scan` | Auto-generate patterns from your codebase |
+| `/dev-workflow-status` | View progress, recent decisions, run history |
+| `/dev-workflow-doctor` | Health check: config, memory, MCP, features |
+| `/dev-workflow-pr` | Generate PR from workflow artifacts |
+
+## How It Works
+
+### The Pipeline
+
+Every request goes through the router, which reads your config, detects intent, and runs the right agent chain:
+
+```
+  You: "fix the login bug"
+   │
+   ▼
+┌─────────────────────────────────┐
+│  Router                         │
+│  1. Load config (project.json)  │
+│  2. Detect intent → DEBUG       │
+│  3. Load memory (3 files)       │
+│  4. Load skills for your stack  │
+│  5. Check skip conditions       │
+└──────────────┬──────────────────┘
+               │
+   ┌───────────▼───────────┐
+   │  Debugger → Builder → │
+   │  Tester → Reviewer    │
+   └───────────┬───────────┘
+               │
+   ┌───────────▼───────────┐
+   │  Log run + Update     │
+   │  memory + Sync        │
+   └───────────────────────┘
 ```
 
-| Agent | Role | Contract Artifact |
-|-------|------|-------------------|
-| **Debugger** | Root cause analysis — REPRO, ROOT_CAUSE, FIX_HYPOTHESIS | `DIAGNOSIS` |
-| **Designer** | UI generation via Gemini MCP | `DESIGNER_COMPLETE` |
-| **Builder** | Implementation with TDD evidence | `BUILDER_COMPLETE` |
-| **Tester** | Test execution with exit codes | `TEST_REPORT` |
-| **Reviewer** | Security/pattern validation (read-only) | `REVIEW_REPORT` |
-| **Planner** | Specs + task breakdown | `PLAN_COMPLETE` |
-| **Migrator** | DB migrations with up/down + rollback | `MIGRATION_PLAN` |
+### Workflow Chains
 
-## Feedback Loops
+| Workflow | Chain | Trigger |
+|----------|-------|---------|
+| **BUILD** | [Designer] → Builder → Tester → Reviewer | Default for any task |
+| **BUILD (UI)** | Designer → Builder → Tester → Reviewer | UI-related files detected |
+| **DEBUG** | Debugger → Builder → Tester → Reviewer | "fix", "bug", "error", "broken" |
+| **PLAN** | Planner → Codex Validate | "plan", "design", "architect" |
+| **HOTFIX** | Debugger → Builder → Tester (targeted) | `/dev-workflow-hotfix` |
+| **MIGRATE** | Migrator → [Builder] → Tester → Reviewer | "migrate", "schema", "migration" |
+| **REVIEW** | Reviewer | "review", "audit", "check" |
+| **SPRINT** | Planner → parallel Builders (worktrees) → Merge → Test → Review | `/dev-workflow-sprint` |
+| **DESIGN** | Designer ↔ User (iterate) | `/dev-workflow-design` |
 
-When tests fail or reviewer requests changes, the router automatically retries the builder with failure context.
+`[agent]` = skippable via config.
 
-```mermaid
-flowchart TD
-    B[Builder] --> T[Tester]
-    T -->|PASS| R[Reviewer]
-    T -->|FAIL| Check1{Retries < 3?}
-    Check1 -->|Yes| B
-    Check1 -->|No| Abort1[ABORT + Log Failure]
+### Automatic Retries
 
-    R -->|APPROVED| Mem[Memory Update]
-    R -->|CHANGES_REQUESTED| Check2{Retries < 2?}
-    Check2 -->|Yes| B
-    Check2 -->|No| Abort2[Present Issues to User]
+Tests fail? Reviewer requests changes? The router retries the builder automatically:
 
-    style B fill:#27ae60,color:#fff
-    style T fill:#f1c40f,color:#000
-    style R fill:#3498db,color:#fff
-    style Abort1 fill:#e74c3c,color:#fff
-    style Abort2 fill:#e74c3c,color:#fff
+```
+Builder → Tester ──PASS──→ Reviewer ──APPROVED──→ Done ✓
+              │                         │
+            FAIL                  CHANGES_REQUESTED
+              │                         │
+         Builder (retry)           Builder (retry)
+              │                         │
+         max 3 attempts            max 2 attempts
 ```
 
-| Loop | Trigger | Max Retries | Config Key |
-|------|---------|-------------|------------|
-| Tester → Builder | `TEST_REPORT.result == "FAIL"` | 3 | `agents.retry_limits.tester_fail` |
-| Reviewer → Builder | `REVIEW_REPORT.final_status == "CHANGES_REQUESTED"` | 2 | `agents.retry_limits.reviewer_changes` |
-| Codex → Planner | `CODEX_REVIEW: ISSUES_FOUND` | 3 | (built-in) |
+### Agent Contracts
 
-## Workflow Chains
+Every agent ends with a structured JSON contract. The router validates required fields before unblocking the next agent. Missing fields? A remediation task is created automatically.
 
-```mermaid
-graph TD
-    subgraph "BUILD (non-UI)"
-        B1[Builder] --> B2[Tester] --> B3[Reviewer] --> B4[Memory]
-    end
+## Configuration
 
-    subgraph "BUILD (UI)"
-        U0[Designer<br/><i>Gemini MCP</i>] --> U1[Builder] --> U2[Tester] --> U3[Reviewer] --> U4[Memory]
-    end
-
-    subgraph "DEBUG"
-        D0[Debugger] --> D1[Builder] --> D2[Tester] --> D3[Reviewer] --> D4[Memory]
-    end
-
-    subgraph "MIGRATE"
-        M0[Migrator] -.-> M1[Builder] --> M2[Tester] --> M3[Reviewer] --> M4[Memory]
-    end
-
-    subgraph "HOTFIX (fast-path)"
-        H0[Debugger] --> H1[Builder] --> H2[Tester<br/><i>targeted only</i>] --> H3[Memory + Postmortem]
-    end
-
-    subgraph "PLAN"
-        P0[Planner] --> P1[Codex Validate] -.->|issues| P0
-        P1 --> P2[Memory]
-    end
-
-    subgraph "DESIGN (standalone)"
-        DS0[Designer<br/><i>Gemini MCP</i>] --> DS1[User Review] -.->|iterate| DS0
-        DS1 --> DS2[Save + Memory]
-    end
-
-    subgraph "REVIEW"
-        R0[Reviewer] --> R1[Memory]
-    end
-
-    subgraph "SPRINT (parallel)"
-        S0[Planner] --> S1[TeamCreate]
-        S1 --> S2a[Builder 1<br/><i>worktree A</i>]
-        S1 --> S2b[Builder 2<br/><i>worktree B</i>]
-        S1 --> S2c[Builder 3<br/><i>worktree C</i>]
-        S2a --> S3[Merge]
-        S2b --> S3
-        S2c --> S3
-        S3 --> S4[Tester] --> S5[Reviewer] --> S6[Memory]
-    end
-
-    style U0 fill:#e91e8e,color:#fff
-    style D0 fill:#e74c3c,color:#fff
-    style H0 fill:#e74c3c,color:#fff
-    style M0 fill:#e67e22,color:#fff
-    style DS0 fill:#e91e8e,color:#fff
-    style P1 fill:#8e44ad,color:#fff
-    style S1 fill:#9b59b6,color:#fff
-    style S2a fill:#27ae60,color:#fff
-    style S2b fill:#27ae60,color:#fff
-    style S2c fill:#27ae60,color:#fff
-```
-
-## Skills (Commands)
-
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `/dev-workflow-router` | Auto-detect intent, run full chain | Any dev task |
-| `/dev-workflow-init` | Bootstrap project: detect stack, install skills | New project or re-configure |
-| `/dev-workflow-init search <q>` | Search skills.sh marketplace | Find new skills |
-| `/dev-workflow-scan` | Auto-generate patterns + constraints from codebase | After init or anytime |
-| `/dev-workflow-sprint` | Parallel build with agent teams + worktrees | Multiple features at once |
-| `/dev-workflow-design` | Generate + iterate UI with Gemini | Before building UI |
-| `/dev-workflow-plan` | Plan + Codex validation | Before major features |
-| `/dev-workflow-hotfix` | Fast incident response | Production bugs |
-| `/dev-workflow-status` | View tasks, runs, memory state | Check progress |
-| `/dev-workflow-doctor` | Config, MCP, memory health check | Troubleshooting |
-| `/dev-workflow-pr` | Generate PR from agent artifacts | After build completes |
-
-## Memory System
-
-```mermaid
-graph LR
-    subgraph ".claude/memory/"
-        AC[activeContext.md<br/><i>focus, decisions, learnings</i>]
-        PA[patterns.md<br/><i>gotchas, conventions</i>]
-        PR[progress.md<br/><i>tasks, verification</i>]
-        RL[runs.jsonl<br/><i>workflow history</i>]
-    end
-
-    subgraph "Archive"
-        AR[archive/<br/><i>compacted entries</i>]
-    end
-
-    Router -->|load at start| AC
-    Router -->|load at start| PA
-    Router -->|load at start| PR
-    Agents -->|memory_notes in contract| Router
-    Router -->|persist at end| AC
-    Router -->|persist at end| PA
-    Router -->|log run| RL
-    AC -.->|>50KB| AR
-    PA -.->|>50KB| AR
-
-    style AC fill:#e74c3c,color:#fff
-    style PA fill:#3498db,color:#fff
-    style PR fill:#27ae60,color:#fff
-    style RL fill:#8e44ad,color:#fff
-```
-
-| File | Purpose | Anchors |
-|------|---------|---------|
-| `activeContext.md` | Current focus, decisions, learnings, references | `## Current Focus`, `## Decisions`, `## Learnings`, `## References` |
-| `patterns.md` | Architecture, conventions, gotchas | `## Architecture Patterns`, `## Common Gotchas` |
-| `progress.md` | Task tracking, verification evidence | `## Tasks`, `## Completed`, `## Verification` |
-| `runs.jsonl` | Workflow execution log (append-only) | N/A (JSONL) |
-
-**Hygiene:** Files > 50KB trigger compaction warning. Old entries archived to `.claude/memory/archive/`.
-
-## Config (`project.json`)
-
-```mermaid
-graph TD
-    Config[".claude/project.json"]
-
-    Config --> Project["project{}<br/>name, description, tech_stack"]
-    Config --> Agents["agents{}<br/>test_command, retry_limits,<br/>skip_conditions"]
-    Config --> Skills["skills{}<br/>project_patterns, auto_load,<br/>work_type_detection"]
-    Config --> Constraints["constraints[]<br/>freeform rules"]
-    Config --> Integrations["integrations{}<br/>clickup, linear, etc."]
-
-    Skills --> WTD["work_type_detection{}<br/>ui: paths + extensions<br/>backend: paths + extensions<br/>domain: paths"]
-    Skills --> AL["auto_load{}<br/>ui: [skill1, skill2]<br/>backend: [skill3]"]
-
-    Agents --> RL2["retry_limits{}<br/>tester_fail: 3<br/>reviewer_changes: 2"]
-    Agents --> SC["skip_conditions{}<br/>tester: [docs-only, ...]<br/>reviewer: [docs-only, ...]"]
-
-    style Config fill:#4a90d9,color:#fff
-```
+All config lives in `.claude/project.json`:
 
 ```json
 {
   "version": "1.0",
   "project": {
     "name": "my-app",
-    "description": "My project",
     "tech_stack": ["typescript", "next.js"]
   },
   "agents": {
@@ -321,244 +167,111 @@ graph TD
     "retry_limits": { "tester_fail": 3, "reviewer_changes": 2 },
     "skip_conditions": {
       "tester": ["docs-only", "config-only", "user-says-skip"],
-      "reviewer": ["docs-only", "config-only", "user-says-skip"],
-      "designer": []
+      "reviewer": ["docs-only", "config-only", "user-says-skip"]
     }
   },
   "skills": {
     "project_patterns": ".claude/skills/project-patterns/SKILL.md",
-    "auto_load": { "ui": ["ui-ux-pro-max"], "backend": [] },
-    "work_type_detection": {
-      "ui": { "paths": ["components/"], "extensions": [".tsx"] },
-      "backend": { "paths": ["api/"], "extensions": [".ts"] }
-    }
+    "auto_load": { "ui": ["ui-ux-pro-max"], "backend": [] }
   },
   "constraints": ["Components < 300 lines"],
-  "integrations": {}
+  "features": {
+    "decision_log": { "enabled": true, "path": "docs/decisions/DECISIONS.md" },
+    "flow_diagrams": { "enabled": true, "format": "mermaid" },
+    "kanban": { "enabled": false, "path": "docs/kanban/BOARD.md", "sync": "none" }
+  }
 }
 ```
 
-## Skip Conditions
+### Key Config Options
 
-```mermaid
-flowchart TD
-    Start[Agent in Chain] --> Check{Skip conditions<br/>match?}
-    Check -->|No match| Run[Run Agent Normally]
-    Check -->|docs-only| Skip
-    Check -->|config-only| Skip
-    Check -->|user-says-skip| Skip
+| Key | What It Controls |
+|-----|-----------------|
+| `agents.tester.test_command` | Command the tester agent runs |
+| `agents.skip_conditions` | When to skip tester/reviewer (e.g. docs-only changes) |
+| `agents.retry_limits` | Max retries for test failures / review changes |
+| `constraints[]` | Freeform rules agents must follow (e.g. "No files > 400 lines") |
+| `features.decision_log` | Append-only log of architectural decisions |
+| `features.flow_diagrams` | Auto-generate Mermaid flow diagrams during planning |
+| `features.kanban` | Task board synced from progress (`sync`: none / github / linear / clickup) |
 
-    Skip[Skip Agent] --> Report["Produce SKIP_REPORT<br/>{artifact, agent, reason}"]
-    Report --> Next[Next Agent Receives<br/>SKIP_REPORT instead<br/>of regular artifact]
+## Skills & Marketplace
 
-    Run --> Contract["Agent Produces<br/>JSON Contract"]
-    Contract --> Validate{Valid?}
-    Validate -->|Yes| Next2[Unblock Next Agent]
-    Validate -->|No| Remediate[REMEDIATION Task]
-    Remediate --> Run
+Skills are auto-recommended based on your detected tech stack, installed from [skills.sh](https://skills.sh/):
 
-    style Skip fill:#f39c12,color:#fff
-    style Report fill:#f39c12,color:#fff
-    style Remediate fill:#e74c3c,color:#fff
-```
+| Stack | Auto-Recommended |
+|-------|-----------------|
+| **React Native** | vercel-react-native, ui-ux-pro-max, expo-native-ui, expo-deployment |
+| **Next.js** | vercel-react, web-design-guidelines, nextjs-app-router, webapp-testing |
+| **Python** | python-testing |
+| **Supabase** | supabase-postgres |
 
-## Quick Start
-
-### Install (one command)
-
-In Claude Code, run:
-
-```
-/plugin marketplace add vlady98ish/claude-dev-workflow
-/plugin install dev-workflow@dev-workflow
-```
-
-This installs **everything**: 11 skills, 7 agents, templates, and the skill registry.
-
-### First Run
-
-Just start working. The router auto-detects your stack and bootstraps the project:
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant R as Router
-    participant D as Detector
-    participant C as Catalog
-
-    U->>R: "build login page"
-    R->>R: .claude/project.json missing!
-    R->>D: Scan project files
-    D->>D: Found: package.json → react-native, expo
-    D->>D: Found: supabase/config.toml → supabase
-    D->>U: "Detected: React Native + Expo + Supabase. Correct?"
-    U->>R: "Yes"
-    R->>C: Load registry/catalog.json
-    C->>R: Recommended skills for stack
-    R->>R: Generate CLAUDE.md, AGENTS.md, .claude/project.json
-    R->>R: Install skills from marketplace
-    R->>R: Create memory directory
-    R->>U: "Project initialized! Continuing with your task..."
-    R->>R: Execute BUILD workflow normally
-```
-
-Or run `/dev-workflow-init` manually for guided setup.
-
-### What Gets Created
-
-| File | Purpose |
-|------|---------|
-| `CLAUDE.md` | Points to AGENTS.md |
-| `AGENTS.md` | Full instructions for all AI agents |
-| `.claude/project.json` | Project config (source of truth) |
-| `.claude/skills/project-patterns/SKILL.md` | Your project conventions |
-| `.claude/memory/` | Session memory (auto-managed) |
-
-### Alternative: Git Clone
+Search for more:
 
 ```bash
-git clone https://github.com/vlady98ish/claude-dev-workflow.git
+/dev-workflow-init search <query>    # inside Claude Code
+npx skills find <query>              # from terminal
 ```
 
-Then in your project, manually symlink skills and agents from the cloned repo into `.claude/`.
-
-## Skill Registry + skills.sh Marketplace
-
-Skills are installed from [skills.sh](https://skills.sh/) marketplace via `npx skills add`. The catalog maps detected stacks to recommended skills automatically.
-
-### Pre-Configured Skills (auto-recommended per stack)
-
-| Stack | Recommended Skills | Optional |
-|-------|-------------------|----------|
-| **React Native** | vercel-react-native (44K), ui-ux-pro-max, expo-native-ui (14K), expo-deployment (7.9K) | callstack-react-native, expo-data-fetching, expo-tailwind |
-| **Next.js** | vercel-react (179K), web-design-guidelines (138K), nextjs-app-router (6.1K), webapp-testing (16K) | tailwind-design-system, frontend-design |
-| **Vue/Nuxt** | web-design-guidelines (138K), webapp-testing (16K) | tailwind-design-system, frontend-design |
-| **Python** | python-testing (5.4K) | — |
-| **Supabase** | supabase-postgres (26K) | nextjs-supabase-auth |
-
-### Search for More Skills
-
-```bash
-# Via CLI directly
-npx skills find react-native
-npx skills find testing
-npx skills find tailwind
-
-# Via dev-workflow
-/dev-workflow-init search <query>
-```
-
-Browse skills at [skills.sh](https://skills.sh/) | [claudemarketplaces.com](https://claudemarketplaces.com/) | [skillsmp.com](https://skillsmp.com/)
-
-### Adding Custom Skills
-
-**From marketplace:** `npx skills add owner/repo@skill-name`
-
-**Local:** Create `.claude/skills/{name}/SKILL.md` in your project.
-
-**Bundled fallbacks:** `registry/skills/` contains offline copies of key skills (vercel-react-native, ui-ux-pro-max, supabase-postgres) for use without internet.
-
-## Design → Build Pipeline
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant D as /design
-    participant G as Gemini MCP
-    participant B as /router (BUILD)
-    participant Bl as Builder
-
-    U->>D: /dev-workflow-design settings page
-    D->>G: Generate component
-    G->>D: TSX code
-    D->>U: Show code + constraints check
-    U->>D: "Make the header bigger"
-    D->>G: Regenerate with feedback
-    G->>D: Updated TSX
-    D->>U: Show updated design
-    U->>D: "Looks good, save it"
-    D->>D: Save to docs/designs/ + update memory
-
-    Note over U,Bl: Later...
-
-    U->>B: "Build the settings page"
-    B->>B: Load memory → find design spec
-    B->>Bl: Pass design spec to builder
-    Bl->>Bl: Integrate with codebase
-```
-
-## Hotfix Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant R as /hotfix
-    participant Dbg as Debugger
-    participant Bld as Builder
-    participant Tst as Tester
-
-    U->>R: /dev-workflow-hotfix app crashes on login
-    R->>Dbg: Diagnose
-    Dbg->>Dbg: Reproduce → Isolate → Root Cause
-    Dbg->>R: DIAGNOSIS {root_cause, fix_hypothesis}
-
-    R->>Bld: Fix based on diagnosis
-    Bld->>Bld: Minimal fix + rollback plan
-    Bld->>R: BUILDER_COMPLETE {changes, rollback}
-
-    R->>Tst: Verify fix (targeted tests only)
-    Tst->>R: TEST_REPORT {exit: 0}
-
-    R->>R: Generate postmortem
-    R->>R: Update memory (patterns.md gotcha)
-    R->>R: Log run to runs.jsonl
-```
+Browse: [skills.sh](https://skills.sh/) · [claudemarketplaces.com](https://claudemarketplaces.com/) · [skillsmp.com](https://skillsmp.com/)
 
 ## Project Structure
 
 ```
 claude-dev-workflow/
-├── .claude-plugin/
-│   └── plugin.json                   # Plugin manifest
-├── agents/
-│   ├── builder.md                    # Implementation specialist
-│   ├── debugger.md                   # Root cause analysis
-│   ├── designer.md                   # UI generation (Gemini MCP)
-│   ├── migrator.md                   # DB migrations
-│   ├── planner.md                    # Architecture & planning
-│   ├── reviewer.md                   # Security & patterns (read-only)
-│   └── tester.md                     # Quality assurance
-├── registry/
-│   ├── catalog.json                  # Stack detection + skill mapping
-│   └── skills/                       # Pre-built tech skills
-│       ├── vercel-react-native-skills/  # React Native + Expo
-│       ├── ui-ux-pro-max/               # UI/UX design intelligence
-│       └── supabase-postgres-best-practices/  # Supabase + Postgres
-├── skills/
-│   ├── dev-workflow-router/SKILL.md  # Entry point & orchestration
-│   ├── dev-workflow-init/SKILL.md    # Project bootstrap + auto-detect
-│   ├── dev-workflow-scan/SKILL.md   # Auto-generate patterns from code
-│   ├── dev-workflow-sprint/SKILL.md # Parallel build with agent teams
-│   ├── dev-workflow-memory/SKILL.md  # Memory management + hygiene
-│   ├── dev-workflow-design/SKILL.md  # UI design iteration
-│   ├── dev-workflow-plan/SKILL.md    # Manual plan + Codex
-│   ├── dev-workflow-hotfix/SKILL.md  # Production fast-path
-│   ├── dev-workflow-status/SKILL.md  # Workflow status + runs
-│   ├── dev-workflow-doctor/SKILL.md  # Health diagnostics
-│   └── dev-workflow-pr/SKILL.md      # PR automation
-├── templates/
-│   ├── project.json                  # Example config
-│   └── project-patterns/SKILL.md    # Example patterns skill
-├── CLAUDE.md                         # Router activation (3 lines)
-└── README.md                         # This file
+├── agents/                        # 7 specialized agents
+│   ├── builder.md                 #   Implementation + TDD
+│   ├── debugger.md                #   Root cause analysis
+│   ├── designer.md                #   UI generation
+│   ├── migrator.md                #   DB migrations
+│   ├── planner.md                 #   Architecture & specs
+│   ├── reviewer.md                #   Security & patterns
+│   └── tester.md                  #   Test execution
+├── skills/                        # 11 workflow skills
+│   ├── dev-workflow-router/       #   Entry point & orchestration
+│   ├── dev-workflow-init/         #   Project bootstrap
+│   ├── dev-workflow-memory/       #   Session memory management
+│   ├── dev-workflow-plan/         #   Planning + Codex validation
+│   ├── dev-workflow-sprint/       #   Parallel builds
+│   ├── dev-workflow-design/       #   UI design iteration
+│   ├── dev-workflow-hotfix/       #   Production fast-path
+│   ├── dev-workflow-scan/         #   Auto-detect patterns
+│   ├── dev-workflow-status/       #   Progress dashboard
+│   ├── dev-workflow-doctor/       #   Health diagnostics
+│   └── dev-workflow-pr/           #   PR automation
+├── registry/                      # Skill catalog + bundled skills
+│   ├── catalog.json               #   Stack → skill mapping
+│   └── skills/                    #   Offline fallbacks
+├── templates/                     # Config & doc templates
+│   ├── project.json
+│   ├── AGENTS.md
+│   └── CLAUDE.md
+└── .claude-plugin/
+    └── plugin.json                # Plugin manifest (v2.0.1)
 ```
 
-## Per-Project Files
+### Per-Project Files (auto-created)
 
-| File | Purpose | Required? |
-|------|---------|-----------|
-| `.claude/project.json` | Project config | Yes |
-| `.claude/skills/project-patterns/SKILL.md` | Project conventions | Optional |
-| `.claude/memory/*.md` | Memory files | Auto-created |
-| `.claude/memory/runs.jsonl` | Run history | Auto-created |
-| `.claude/skills/{name}/SKILL.md` | Additional skills | Optional |
+```
+your-project/
+├── CLAUDE.md                      # Points to AGENTS.md
+├── AGENTS.md                      # Full AI agent instructions
+├── .claude/
+│   ├── project.json               # Project config (source of truth)
+│   ├── memory/                    # Persists across sessions
+│   │   ├── activeContext.md
+│   │   ├── patterns.md
+│   │   ├── progress.md
+│   │   └── runs.jsonl
+│   └── skills/
+│       └── project-patterns/      # Your project conventions
+└── docs/                          # Generated artifacts
+    ├── plans/                     # Feature plans
+    ├── decisions/DECISIONS.md     # Decision log
+    ├── flows/                     # Mermaid flow diagrams
+    └── kanban/BOARD.md            # Task board (if enabled)
+```
+
+## License
+
+MIT

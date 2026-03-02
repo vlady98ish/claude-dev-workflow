@@ -62,6 +62,7 @@ EVERY WORKFLOW MUST:
 | `## Tasks` | progress | GUARANTEED |
 | `## Completed` | progress | GUARANTEED |
 | `## Verification` | progress | GUARANTEED |
+| `## Log` | DECISIONS | GUARANTEED |
 
 **NEVER use as anchors:**
 - Table headers
@@ -186,6 +187,60 @@ Read(file_path=".claude/memory/activeContext.md")  # Verify
 
 ## Verification
 - `command` → exit 0 (X/X)
+
+## Last Updated
+[timestamp]
+```
+
+### docs/decisions/DECISIONS.md
+```markdown
+# Decision Log
+
+Architectural decisions and their rationale. Append-only — newest entries at top of ## Log.
+
+## Log
+
+<!-- entries appended here by workflow agents -->
+
+## Last Updated
+[timestamp]
+```
+
+### docs/flows/YYYY-MM-DD-{feature}.md
+```markdown
+# Flow: {Feature Name}
+
+**Plan:** {plan_path}
+**Date:** {YYYY-MM-DD}
+
+## Main Flow
+
+```mermaid
+flowchart TD
+    A[Start] --> B{...}
+```
+
+## Notes
+
+- {assumptions}
+```
+
+### docs/kanban/BOARD.md
+```markdown
+# Kanban Board
+
+> Auto-generated from `.claude/memory/progress.md`. Do NOT edit manually.
+> **Last synced:** {timestamp}
+
+## Backlog
+
+## In Progress
+
+## Review
+
+## Blocked
+
+## Done (recent)
 
 ## Last Updated
 [timestamp]

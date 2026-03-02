@@ -33,12 +33,27 @@ TaskGet(each) → extract artifacts
 | Builder | CHANGES list, implementation notes |
 | Tester | TEST_REPORT, coverage, exit codes |
 | Reviewer | REVIEW_REPORT, FINAL_STATUS |
+| Planner | plan_path, flow_path, decisions_added |
 
 ### 2) Detect Changes
 
 ```
 Bash(command="git diff main...HEAD --stat")
 Bash(command="git log main...HEAD --oneline")
+```
+
+### 2.5) Gather Feature Artifacts
+
+```
+# Decision log entries since branch diverge
+if exists("docs/decisions/DECISIONS.md"):
+  Read(file_path="docs/decisions/DECISIONS.md")
+  # Extract entries added since branch diverge date
+  Bash(command="git log main...HEAD --format='%ai' | tail -1")  # get branch start date
+  # Filter ## Log entries newer than branch start
+
+# Flow diagrams created during this branch
+Bash(command="git diff main...HEAD --name-only -- 'docs/flows/*.md'")
 ```
 
 ### 3) Generate PR Title
@@ -75,6 +90,12 @@ Derive type from workflow:
 
 ## Acceptance Criteria
 {from builder/tester AC_VERIFICATION table}
+
+## Architectural Decisions
+{from docs/decisions/DECISIONS.md entries added during this branch, if any}
+
+## Flow Diagrams
+{list of flow diagram files added, with Mermaid preview if available}
 
 ## Rollback
 {from builder/hotfix rollback plan, if available}
