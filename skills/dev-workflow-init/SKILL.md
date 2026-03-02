@@ -234,6 +234,46 @@ if not exists(".claude/skills/project-patterns/SKILL.md"):
   Bash(command="cp {PLUGIN_DIR}/templates/project-patterns/SKILL.md .claude/skills/project-patterns/SKILL.md")
 ```
 
+### Generate CLAUDE.md and AGENTS.md
+
+Generate both files in the project root. **CLAUDE.md** is a simple pointer; **AGENTS.md** contains all instructions.
+
+```
+PLUGIN_DIR = find_plugin_dir()
+
+# Read templates
+Read(file_path="{PLUGIN_DIR}/templates/CLAUDE.md")
+Read(file_path="{PLUGIN_DIR}/templates/AGENTS.md")
+
+# Generate AGENTS.md — replace placeholders with real values:
+#   {{PROJECT_NAME}}        → user_project_name
+#   {{PROJECT_DESCRIPTION}} → user_description
+#   {{TECH_STACK}}          → bullet list of detected stacks (e.g. "- React Native / Expo\n- TypeScript")
+#   {{CONSTRAINTS}}         → from project.json constraints, or "None yet. Add to `.claude/project.json`."
+
+# If AGENTS.md already exists → ask before overwriting
+if exists("AGENTS.md"):
+  AskUserQuestion:
+    question: "AGENTS.md already exists. Overwrite with generated version?"
+    options:
+      - "Yes, overwrite"
+      - "No, keep existing"
+  if "No" → skip
+
+Write(file_path="AGENTS.md", content=rendered_agents_md)
+
+# If CLAUDE.md already exists → ask before overwriting
+if exists("CLAUDE.md"):
+  AskUserQuestion:
+    question: "CLAUDE.md already exists. Overwrite with link to AGENTS.md?"
+    options:
+      - "Yes, overwrite"
+      - "No, keep existing"
+  if "No" → skip
+
+Write(file_path="CLAUDE.md", content=rendered_claude_md)
+```
+
 ## Step 10: Show Summary
 
 ```markdown
@@ -252,6 +292,8 @@ if not exists(".claude/skills/project-patterns/SKILL.md"):
 | supabase-postgres | skills.sh (26K installs) | Backend |
 
 ### Created Files
+- `CLAUDE.md` — points to AGENTS.md
+- `AGENTS.md` — full project instructions for all AI agents
 - `.claude/project.json` — project config
 - `.claude/skills/project-patterns/SKILL.md` — add your conventions here
 - `.claude/memory/` — memory directory (auto-populated on first run)
