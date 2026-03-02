@@ -37,6 +37,12 @@
       "domain": { "paths": ["domain/", "lib/", "utils/", "core/"] }
     }
   },
+  "models": {
+    "designer": {
+      "backend": "cursor-agent",
+      "cursor_model": "gemini-3.1-pro"
+    }
+  },
   "constraints": [
     "Example: Screens < 400 lines",
     "Example: Use project-specific icon library only"

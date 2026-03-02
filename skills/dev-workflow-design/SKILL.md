@@ -3,7 +3,7 @@ name: dev-workflow-design
 user-invocable: true
 description: |
   Generate and iterate on UI designs before building.
-  Uses Gemini MCP for code generation + project constraints for validation.
+  Uses Cursor Agent, Gemini MCP, or Claude with UI skills for code generation + project constraints for validation.
   Standalone — does NOT trigger builder/tester/reviewer.
 
   Triggers: /dev-workflow-design <description of what to design>
@@ -56,14 +56,22 @@ Glob(pattern="src/components/**/*.tsx")  # or from config work_type_detection.ui
 # Read 2-3 similar components to extract style patterns
 ```
 
-### 5) Generate with Gemini
+### 5) Generate with AI Backend
 
-Invoke designer agent with loaded context:
+Read model config and invoke designer agent with loaded context:
 
 ```
+# Read backend config (defaults if not set)
+backend = config.models.designer.backend or "cursor-agent"
+cursor_model = config.models.designer.cursor_model or "gemini-3.1-pro"
+
 Agent(
   subagent_type="designer",
   prompt="
+## Model Config
+backend: {backend}
+cursor_model: {cursor_model}
+
 ## Design Task
 {user_request}
 
@@ -171,12 +179,16 @@ Read(file_path=".claude/memory/activeContext.md")  # Verify
 
 Add design decisions to memory for builder to reference later.
 
-## Gemini Fallback
+## Generation Fallback Chain
 
-If Gemini MCP is unavailable:
-1. Use Claude (designer agent) to generate the code directly
-2. Note in output: "Generated without Gemini — consider re-running when available"
-3. Continue with validation and iteration as normal
+Designer uses a waterfall of backends (configured in `config.models.designer.backend`):
+
+1. **Cursor Agent CLI** (default) — `cursor agent -p --model {cursor_model}` with 5 min timeout
+2. **Gemini MCP** — `mcp__gemini__generate` if Cursor CLI unavailable or fails
+3. **Skill-only** — Claude generates directly using loaded UI skills as style guide
+
+If the configured backend fails, designer automatically falls through to the next.
+Output notes which backend was used. Continue with validation and iteration as normal.
 
 ## Relationship to BUILD Workflow
 

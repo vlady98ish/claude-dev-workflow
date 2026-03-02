@@ -25,7 +25,7 @@ description: |
 2. **Every agent MUST produce a JSON contract** at the end of its output. Validate before unblocking next agent.
 3. **HANDOFF: ROUTER** from reviewer = workflow complete → run memory-update.
 4. **Config is the source of truth** for constraints, test commands, and skip conditions.
-5. **If Gemini MCP unavailable**, UI tasks fall back to builder-only (no error).
+5. **Designer always available** for UI tasks (uses waterfall: Cursor Agent → Gemini MCP → skill-only).
 6. **Log every run** to `.claude/memory/runs.jsonl` with outcome and metrics.
 
 ---
@@ -170,7 +170,7 @@ for agent_name, conditions in config.agents.skip_conditions:
 | REVIEW | reviewer → memory-update |
 | PLAN | planner → codex-validate → memory-update |
 
-`[agent]` = skippable via skip_conditions. Designer requires Gemini MCP.
+`[agent]` = skippable via skip_conditions. Designer uses backend waterfall (Cursor → Gemini → skill-only).
 
 ## Agent Contract Validation
 
@@ -305,7 +305,7 @@ When MAX_RETRIES exceeded:
 ```
 TaskCreate({ subject: "{name} BUILD: {feature}", activeForm: "Building {feature}" })
 
-if work_type == "ui" and gemini_available and "designer" not in skipped:
+if work_type == "ui" and "designer" not in skipped:
   TaskCreate({ subject: "{name} designer: Generate UI", activeForm: "Designing" })
 
 TaskCreate({ subject: "{name} builder: Implement", activeForm: "Building" })
