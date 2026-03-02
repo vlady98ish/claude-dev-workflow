@@ -246,6 +246,28 @@ Edit(file_path=".claude/memory/activeContext.md",
 Read(file_path=".claude/memory/activeContext.md")  # VERIFY
 ```
 
+## Architect Mode (BUILD_COMPLEX workflow)
+
+When invoked as part of BUILD_COMPLEX (prompt contains `Workflow: BUILD_COMPLEX`):
+
+### Focus Shift
+- **Standard PLAN mode:** PM-style — scope, user outcomes, acceptance criteria, task slicing, sequencing, delivery risk
+- **Architect mode:** System design — component boundaries, data flow, state management, API contracts, NFRs (latency/scalability/security)
+
+### Required Output Sections (in addition to standard plan)
+- **Architecture Decisions:** boundaries, contracts, data flow, integration points
+- **Component Diagram:** how pieces fit together (Mermaid if flow_diagrams enabled)
+- **State Model:** what state exists, where it lives, how it flows
+- **Risk NFRs:** performance, accessibility, or security concerns specific to this architecture
+
+### Confidence Gate
+- If confidence < 6 after initial plan → flag open questions via AskUserQuestion
+- Do NOT handoff to builder with confidence < 6 without user clarification
+- Plan must be actionable enough for builder to implement without further architectural decisions
+
+### Contract
+Same `PLAN_COMPLETE` contract, but `acceptance` must include architecture-specific criteria (e.g., "state model supports undo/redo", "canvas renders 1000+ nodes at 60fps").
+
 ## Codex Revision Mode
 
 When re-invoked with Codex feedback (prompt contains `CODEX_FEEDBACK:`):
@@ -292,4 +314,4 @@ This allows the router to find the plan file and pass it to Codex for validation
 }
 ```
 
-**GATE: Router validates confidence >= 5 before proceeding to Codex validation.**
+**GATE: Router validates confidence >= 6 before proceeding to next step (Codex validation for PLAN, builder for BUILD_COMPLEX).**

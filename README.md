@@ -34,10 +34,11 @@ One config file. Any project. Shut up and ship.
 Just start working — the router auto-detects your intent and runs the right workflow:
 
 ```
-> build a login page          → BUILD:  Designer → Builder → Tester → Reviewer
-> fix the auth crash          → DEBUG:  Debugger → Builder → Tester → Reviewer
-> plan the payments feature   → PLAN:   Planner → Codex Validate
-> review the auth module      → REVIEW: Reviewer
+> build a login page          → BUILD:          Designer → Builder → Tester → Reviewer
+> implement infinite canvas   → BUILD_COMPLEX:  Planner → Builder → Tester → Reviewer
+> fix the auth crash          → DEBUG:          Debugger → Builder → Tester → Reviewer
+> plan the payments feature   → PLAN:           Planner → Codex Validate
+> review the auth module      → REVIEW:         Reviewer
 ```
 
 On first run, the plugin bootstraps your project: detects tech stack, installs recommended skills from [skills.sh](https://skills.sh/), and generates config.
@@ -124,6 +125,7 @@ Every request goes through the router, which reads your config, detects intent, 
 |----------|-------|---------|
 | **BUILD** | [Designer] → Builder → Tester → Reviewer | Default for any task |
 | **BUILD (UI)** | Designer → Builder → Tester → Reviewer | UI-related files detected |
+| **BUILD_COMPLEX** | Planner → [Designer] → Builder → Tester → Reviewer | Complex architecture auto-detected |
 | **DEBUG** | Debugger → Builder → Tester → Reviewer | "fix", "bug", "error", "broken" |
 | **PLAN** | Planner → [OctoCode Research] → [Codex Validate] | "plan", "design", "architect" |
 | **HOTFIX** | Debugger → Builder → Tester (targeted) | `/ship-hotfix` |

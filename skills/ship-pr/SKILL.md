@@ -64,7 +64,7 @@ Rules:
 - Prefix with type: `feat:`, `fix:`, `refactor:`, `docs:`, `perf:`
 
 Derive type from workflow:
-- BUILD → `feat:` or `refactor:`
+- BUILD / BUILD_COMPLEX → `feat:` or `refactor:`
 - DEBUG/HOTFIX → `fix:`
 - PLAN → don't create PR (no code changes)
 

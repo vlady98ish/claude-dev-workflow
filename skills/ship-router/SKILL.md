@@ -109,6 +109,28 @@ If missing field → use default. If file missing after bootstrap → use full d
 
 **Conflict Resolution:** ERROR always wins. MIGRATE beats PLAN/BUILD. "fix the migration" = DEBUG.
 
+**Override:** If user explicitly says "don't plan", "just build", "skip planning" → stay BUILD regardless of complexity, but emit one-line risk warning: "Skipping planning for a complex task — you may need to course-correct mid-build."
+
+## Step 1.5: Complexity Gate (BUILD only)
+
+**Run this step ONLY when Step 1 picked BUILD.** Evaluate whether the task is complex enough to need a planner before builder.
+
+### Complexity Signals (count how many are true):
+1. **Multi-capability:** Request combines 2+ major capabilities from different subsystems (e.g., "pan/zoom" + "drag-and-drop", "offline sync" + "conflict resolution")
+2. **New architecture:** Requires a new core architecture/engine, not just wiring into existing patterns
+3. **Cross-layer scope:** Touches UI + state model + API/DB/infrastructure together
+4. **Performance-sensitive interaction:** Canvas/editor/realtime/virtualization/concurrency/animation system
+5. **Major design decisions:** Unfamiliar pattern where multiple valid approaches exist and the wrong choice is expensive to reverse
+
+### Hard Escalation Terms (any match → auto-complex):
+"infinite canvas", "whiteboard core", "collaborative realtime", "plugin system", "workflow engine", "state machine", "virtual DOM", "rendering engine", "compiler", "interpreter", "protocol", "CRDT", "event sourcing"
+
+### Decision:
+- **Any hard escalation term present** → workflow = `BUILD_COMPLEX`
+- **2+ complexity signals true** → workflow = `BUILD_COMPLEX`
+- **When uncertain** for implementation tasks → prefer `BUILD_COMPLEX` (planning is cheaper than rewriting)
+- **Otherwise** → keep `BUILD`
+
 ## Step 2: Load Memory
 
 ```
@@ -174,12 +196,21 @@ for agent_name, conditions in config.agents.skip_conditions:
 |----------|-------|
 | BUILD | [designer] → builder → [tester] → [reviewer] → memory-update |
 | BUILD (UI) | designer → builder → [tester] → [reviewer] → memory-update |
+| BUILD_COMPLEX | planner → [designer] → builder → [tester] → [reviewer] → memory-update |
 | DEBUG | debugger → builder → [tester] → [reviewer] → memory-update |
 | MIGRATE | migrator → [builder] → [tester] → [reviewer] → memory-update |
 | REVIEW | reviewer → memory-update |
 | PLAN | planner → [octocode-research] → [codex-validate] → memory-update |
 
 `[agent]` = skippable via skip_conditions. Designer uses backend waterfall (Cursor → Gemini → skill-only).
+
+### BUILD_COMPLEX: Planner Rules
+
+When planner runs as part of BUILD_COMPLEX:
+1. Planner must produce `PLAN_COMPLETE` contract with `plan_path`, `acceptance`, `confidence`
+2. If `confidence < 6` → use AskUserQuestion to clarify before proceeding to builder
+3. Persist `planner_contract` — inject `plan_path + acceptance + architecture decisions` into **designer** (if present), **builder**, and all **builder retries**
+4. Codex/OctoCode validation is **skipped by default** for speed. Exception: if planner `confidence < 6` after user clarification → trigger Codex validation before builder
 
 ## Agent Contract Validation
 
@@ -229,6 +260,9 @@ if tester_contract.result == "FAIL":
 ## Original Request
 {original user request}
 
+## Architecture Plan (if BUILD_COMPLEX)
+{planner_contract.plan_path, acceptance, architecture decisions — if workflow is BUILD_COMPLEX}
+
 ## Your Previous Changes
 {builder_contract.changes from last attempt}
 
@@ -264,6 +298,9 @@ if reviewer_contract.final_status == "CHANGES_REQUESTED":
 
 ## Original Request
 {original user request}
+
+## Architecture Plan (if BUILD_COMPLEX)
+{planner_contract.plan_path, acceptance, architecture decisions — if workflow is BUILD_COMPLEX}
 
 ## Your Previous Changes
 {builder_contract.changes from last attempt}
@@ -322,6 +359,32 @@ if work_type == "ui" and "designer" not in skipped:
 
 TaskCreate({ subject: "{name} builder: Implement", activeForm: "Building" })
 # blocked_by designer if present
+
+if "tester" not in skipped:
+  TaskCreate({ subject: "{name} tester: Test", activeForm: "Testing" })
+  # blocked_by builder
+
+if "reviewer" not in skipped:
+  TaskCreate({ subject: "{name} reviewer: Review", activeForm: "Reviewing" })
+  # blocked_by tester (or builder if tester skipped)
+
+TaskCreate({ subject: "{name} Memory Update", activeForm: "Persisting" })
+# blocked_by last agent in chain
+```
+
+### BUILD_COMPLEX Workflow Tasks
+```
+TaskCreate({ subject: "{name} BUILD_COMPLEX: {feature}", activeForm: "Planning + Building {feature}" })
+
+TaskCreate({ subject: "{name} planner: Architecture plan", activeForm: "Planning architecture" })
+
+if work_type == "ui" and "designer" not in skipped:
+  TaskCreate({ subject: "{name} designer: Generate UI", activeForm: "Designing" })
+  # blocked_by planner
+
+TaskCreate({ subject: "{name} builder: Implement", activeForm: "Building" })
+# blocked_by planner (and designer if present)
+# IMPORTANT: Include planner_contract (plan_path, acceptance, architecture decisions) in builder prompt
 
 if "tester" not in skipped:
   TaskCreate({ subject: "{name} tester: Test", activeForm: "Testing" })
@@ -404,7 +467,7 @@ Agent(
 ## Task Context
 - **Task ID:** {taskId}
 - **Project:** {config.project.name}
-- **Workflow:** {BUILD|DEBUG|MIGRATE|PLAN|REVIEW}
+- **Workflow:** {BUILD|BUILD_COMPLEX|DEBUG|MIGRATE|PLAN|REVIEW}
 
 ## User Request
 {request}
@@ -508,7 +571,7 @@ Entry format:
 ```json
 {
   "timestamp": "2026-03-01T12:00:00Z",
-  "workflow": "BUILD|DEBUG|MIGRATE|PLAN|REVIEW|HOTFIX",
+  "workflow": "BUILD|BUILD_COMPLEX|DEBUG|MIGRATE|PLAN|REVIEW|HOTFIX",
   "project": "{config.project.name}",
   "feature": "{feature_summary}",
   "result": "APPROVED|CHANGES_REQUESTED|BLOCKED|FAIL",
@@ -581,11 +644,23 @@ After memory update, for each integration in `config.integrations`:
 ### BUILD
 1. Load config → Validate → Load memory → Check progress.md
 2. Detect work type → Load skills → Evaluate skip conditions
-3. Clarify if ambiguous (AskUserQuestion)
-4. Create task hierarchy
-5. Execute chain, validate each contract
-6. **Feedback loop:** If tester FAIL → re-invoke builder (max 3). If reviewer CHANGES_REQUESTED → re-invoke builder → tester → reviewer (max 2).
-7. Log run → Integration sync → Memory update
+3. **Complexity Gate** → if complex, upgrade to BUILD_COMPLEX (see below)
+4. Clarify if ambiguous (AskUserQuestion)
+5. Create task hierarchy
+6. Execute chain, validate each contract
+7. **Feedback loop:** If tester FAIL → re-invoke builder (max 3). If reviewer CHANGES_REQUESTED → re-invoke builder → tester → reviewer (max 2).
+8. Log run → Integration sync → Memory update
+
+### BUILD_COMPLEX
+1. Load config → Validate → Load memory
+2. Detect work type → Load skills → Evaluate skip conditions
+3. **Planner first:** produces architecture plan + task breakdown
+4. If planner confidence < 6 → AskUserQuestion to clarify, then re-plan
+5. If still confidence < 6 after clarification → trigger Codex validation
+6. Persist planner_contract → inject into all downstream agents
+7. Execute remaining chain: [designer] → builder → [tester] → [reviewer]
+8. **Feedback loops** same as BUILD (builder retries include planner context)
+9. Log run → Integration sync → Memory update
 
 ### DEBUG
 1. Load config → Load memory → Check patterns.md gotchas
