@@ -134,7 +134,45 @@ If `features.kanban.enabled`:
 - Missing `## Log` anchor → "Add `## Log` section to DECISIONS.md"
 - Stale kanban → "Next workflow run will refresh it"
 
-### 7) Stale State Detection
+### 8) LSP Health
+
+Check LSP configuration from project.json `lsp` section:
+
+```
+Read(file_path=".claude/project.json")  # already loaded from step 1
+```
+
+**If `lsp` key missing or `lsp.enabled === false`:**
+Report as SKIP (not configured). Suggest: "Run `/ship-init` to enable LSP, or add manually to project.json."
+
+**If `lsp.enabled === true`:**
+
+| Check | How | Pass | Fail Fix |
+|-------|-----|------|----------|
+| `ENABLE_LSP_TOOL` flag | `Read(file_path="~/.claude/settings.json")` — check for `"ENABLE_LSP_TOOL"` in env | ✓ flag set | ✗ Add `"env": {"ENABLE_LSP_TOOL": "1"}` to `~/.claude/settings.json` |
+| Language server binary | `Bash(command="which {server_name}")` for each server in `lsp.servers` | ✓ found | ✗ Run: `{server.install}` |
+| Claude LSP plugin | `Bash(command="claude plugin list 2>&1")` — check for LSP-related plugin | ✓ enabled | ✗ Run: `claude plugin enable {plugin}` |
+
+**Output format:**
+```
+### LSP
+- Config: ✓ enabled (2 servers configured)
+- ENABLE_LSP_TOOL: ✓ set in ~/.claude/settings.json
+- typescript-language-server: ✓ installed (/usr/local/bin/typescript-language-server)
+- pyright: ✗ NOT installed → Run: npm i -g pyright
+- Plugin: ✓ enabled
+```
+
+Or if not configured:
+```
+### LSP
+- Config: SKIP (not configured)
+  → Enable with /ship-init or add "lsp" section to .claude/project.json
+```
+
+---
+
+### 9) Stale State Detection
 - Any tasks stuck in `in_progress` for > 24 hours?
 - Any `runs.jsonl` entries showing repeated failures?
 - Any memory files with `## Last Updated` > 7 days old?

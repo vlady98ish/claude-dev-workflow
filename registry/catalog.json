@@ -156,6 +156,12 @@
         "package_deps": ["react-native", "expo"],
         "any_match": true
       },
+      "lsp": {
+        "typescript-language-server": {
+          "install": "npm i -g typescript-language-server typescript",
+          "languages": ["typescript", "javascript", "typescriptreact", "javascriptreact"]
+        }
+      },
       "recommended_skills": [
         "vercel-react-native",
         "ui-ux-pro-max",
@@ -187,6 +193,12 @@
         "files": ["next.config.js", "next.config.mjs", "next.config.ts"],
         "package_deps": ["next"],
         "any_match": true
+      },
+      "lsp": {
+        "typescript-language-server": {
+          "install": "npm i -g typescript-language-server typescript",
+          "languages": ["typescript", "javascript", "typescriptreact", "javascriptreact"]
+        }
       },
       "recommended_skills": [
         "vercel-react",
@@ -221,6 +233,12 @@
         "package_deps": ["vue", "nuxt"],
         "any_match": true
       },
+      "lsp": {
+        "typescript-language-server": {
+          "install": "npm i -g typescript-language-server typescript",
+          "languages": ["typescript", "javascript", "typescriptreact", "javascriptreact"]
+        }
+      },
       "recommended_skills": ["web-design-guidelines", "webapp-testing"],
       "optional_skills": ["tailwind-design-system", "frontend-design"],
       "default_config": {
@@ -244,6 +262,12 @@
         "package_deps": ["fastapi", "flask", "django"],
         "any_match": true
       },
+      "lsp": {
+        "pyright": {
+          "install": "npm i -g pyright",
+          "languages": ["python"]
+        }
+      },
       "recommended_skills": ["python-testing"],
       "optional_skills": [],
       "default_config": {
@@ -264,6 +288,12 @@
         "files": ["go.mod"],
         "any_match": true
       },
+      "lsp": {
+        "gopls": {
+          "install": "go install golang.org/x/tools/gopls@latest",
+          "languages": ["go"]
+        }
+      },
       "recommended_skills": [],
       "optional_skills": [],
       "default_config": {
@@ -282,6 +312,12 @@
         "files": ["supabase/config.toml"],
         "package_deps": ["@supabase/supabase-js"],
         "any_match": true
+      },
+      "lsp": {
+        "typescript-language-server": {
+          "install": "npm i -g typescript-language-server typescript",
+          "languages": ["typescript", "javascript"]
+        }
       },
       "recommended_skills": ["supabase-postgres"],
       "optional_skills": ["nextjs-supabase-auth"],

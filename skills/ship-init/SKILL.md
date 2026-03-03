@@ -193,6 +193,87 @@ AskUserQuestion:
 **Also offer search:**
 "Want to find more skills? I can search the skills.sh marketplace for anything."
 
+## Step 6.5: LSP Setup
+
+Claude Code supports LSP (Language Server Protocol) for semantic code navigation (go-to-definition, find-references, diagnostics). This is significantly better than grep-based search for large codebases.
+
+### Collect LSP servers from detected stacks
+
+```python
+lsp_servers = {}
+for stack in detected_stacks:
+  stack_lsp = catalog.stack_presets[stack].get("lsp", {})
+  for server_name, server_config in stack_lsp.items():
+    if server_name not in lsp_servers:
+      lsp_servers[server_name] = server_config
+```
+
+If no LSP servers found for detected stacks → skip this step entirely.
+
+### Ask user
+
+```
+AskUserQuestion:
+  question: "Enable LSP for semantic code navigation? (go-to-definition, find-references — much better than grep)"
+  header: "LSP"
+  options:
+    - label: "Yes, set it up (Recommended)"
+      description: "Installs language server(s) and configures project for LSP-powered navigation."
+    - label: "Skip for now"
+      description: "You can enable LSP later with /ship-doctor."
+```
+
+### If yes:
+
+**1. Install language server binaries:**
+```
+for server_name, server_config in lsp_servers.items():
+  Bash(command="{server_config.install}")
+  # Verify installation
+  Bash(command="which {server_name}")
+```
+
+**2. Check ENABLE_LSP_TOOL flag:**
+```
+Read(file_path="~/.claude/settings.json")  # expand ~ to actual home dir
+```
+
+If `ENABLE_LSP_TOOL` is not set in the settings env vars, inform the user:
+```
+Note: LSP requires the ENABLE_LSP_TOOL feature flag in your Claude Code settings.
+Add to ~/.claude/settings.json → "env": { "ENABLE_LSP_TOOL": "1" }
+```
+
+Do NOT modify `~/.claude/settings.json` without explicit user permission.
+
+**3. Check Claude plugins:**
+```
+Bash(command="claude plugin list 2>&1 || echo 'plugin command not available'")
+```
+
+If a relevant LSP plugin is available but not enabled:
+```
+Bash(command="claude plugin enable {plugin_name}")
+```
+
+**4. Update project.json LSP section** (will be written in Step 8):
+```python
+lsp_config = {
+  "enabled": True,
+  "servers": lsp_servers
+}
+```
+
+**5. Add LSP constraint:**
+```python
+constraints.append("Prefer LSP tools (goToDefinition, findReferences) over grep for code navigation when available")
+```
+
+### If skip:
+Set `lsp_config = {"enabled": false, "servers": {}}` and continue.
+
+---
+
 ## Step 7: Install Skills
 
 **Primary method: `npx skills add` (from skills.sh marketplace)**
@@ -250,6 +331,7 @@ config = {
     "auto_load": build_auto_load(installed_skills, catalog),
     "work_type_detection": merge_work_type_detection(detected_stacks, catalog)
   },
+  "lsp": lsp_config,  # from Step 6.5
   "constraints": [],
   "integrations": {},
   "features": {

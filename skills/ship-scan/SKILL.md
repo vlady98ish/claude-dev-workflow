@@ -51,6 +51,39 @@ Glob(pattern="biome.json")
 Glob(pattern="tsconfig*.json")
 ```
 
+## Step 1.5: Detect LSP Signals
+
+Check for config files that indicate LSP would work well:
+
+```
+# TypeScript LSP signal
+Glob(pattern="tsconfig.json")
+Glob(pattern="tsconfig*.json")
+
+# Python LSP signal
+Glob(pattern="pyrightconfig.json")
+Grep(pattern="\\[tool\\.pyright\\]", path="pyproject.toml")  # if pyproject.toml exists
+
+# Go LSP signal
+Glob(pattern=".gopls")
+Glob(pattern="go.mod")
+```
+
+Track detected LSP signals:
+```python
+lsp_signals = []
+if tsconfig_found:
+  lsp_signals.append("tsconfig.json found — TypeScript LSP (typescript-language-server) would provide semantic navigation")
+if pyrightconfig_found or pyright_in_pyproject:
+  lsp_signals.append("Pyright config found — Python LSP (pyright) would provide semantic navigation")
+if gopls_config_found or go_mod_found:
+  lsp_signals.append("Go project detected — Go LSP (gopls) would provide semantic navigation")
+```
+
+These signals are included in the scan summary (Step 9) to suggest enabling LSP if not already configured.
+
+---
+
 ## Step 2: Extract Lint Rules → Constraints
 
 ### ESLint
@@ -262,6 +295,17 @@ AskUserQuestion:
 - No inline styles
 - Strict TypeScript
 - ...
+
+### LSP Signals
+{if lsp_signals detected and lsp not already enabled in project.json:}
+- {each lsp_signal}
+- → Run `/ship-init` to enable LSP, or add `"lsp": {"enabled": true, ...}` to project.json
+
+{if lsp already enabled:}
+- ✓ LSP already configured in project.json
+
+{if no signals:}
+- No LSP config files detected
 
 ### Files Updated
 - `.claude/skills/project-patterns/SKILL.md` — project conventions
